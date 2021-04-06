@@ -1,0 +1,281 @@
+#!/bin/sh
+#
+# Configure host as a caching proxy to the Galaxy CernVM-FS repositories.
+#
+# USAGE
+#
+#     sudo ./cvmfs-galaxy-proxy-setup.sh -v <CLIENT_HOSTS>
+#
+# Where CLIENT_HOSTS are the addresses of the client hosts that will
+# be permitted to access the proxy. CIDR addresses allowed
+# (e.g. 10.0.0.0/24).
+#
+# The above may take about 40 seconds to run.
+#
+# DESCRIPTION
+#
+# Install a Squid Proxy server for accessing the Galaxy CernVM-FS
+# repositories.
+#
+# Copyright (C) 2021, QCIF Ltd.
+#================================================================
+
+PROGRAM='cvmfs-galaxy-proxy-setup'
+VERSION='1.0.0'
+
+EXE=$(basename "$0" .sh)
+
+#----------------------------------------------------------------
+# Constants
+
+#----------------
+
+DEFAULT_PROXY_PORT=3128
+
+#----------------
+# The Stratum 1 servers
+#
+# Values were obtained from
+# <https://galaxyproject.org/admin/reference-data-repo/>
+
+STRATUM_ONE_SERVERS="
+  cvmfs1-psu0.galaxyproject.org \
+  cvmfs1-iu0.galaxyproject.org \
+  cvmfs1-tacc0.galaxyproject.org \
+  cvmfs1-ufr0.galaxyproject.eu \
+  cvmfs1-mel0.gvl.org.au"
+
+#----------------------------------------------------------------
+
+TIMESTAMP=$(date '+%F %T %Z')
+PROGRAM_INFO="Created by $PROGRAM $VERSION [$TIMESTAMP]"
+
+#----------------------------------------------------------------
+# Error handling
+
+# Exit immediately if a simple command exits with a non-zero status.
+# Better to abort than to continue running when something went wrong.
+set -e
+
+#----------------------------------------------------------------
+# Command line arguments
+
+CLIENTS=
+PROXY_PORT=$DEFAULT_PROXY_PORT
+VERBOSE=
+SHOW_VERSION=
+SHOW_HELP=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -p|--port)
+      PROXY_PORT="$2"
+      shift
+      shift
+      ;;
+    -v|--verbose)
+      VERBOSE=yes
+      shift # past argument
+      ;;
+    --version)
+      SHOW_VERSION=yes
+      shift # past argument
+      ;;
+    -h|--help)
+      SHOW_HELP=yes
+      shift # past argument
+      ;;
+    *)    # unknown option
+      if echo "$1" | grep ^- >/dev/null; then
+        echo "$EXE: usage error: unknown option: \"$1\"" >&2
+        exit 2
+      else
+        # Use as a client address
+
+        if echo "$1" | grep '^http://' >/dev/null; then
+          echo "$EXE: usage error: expecting an address, not a URL: \"$1\"" >&2
+          exit 2
+        fi
+        if echo "$1" | grep '^https://' >/dev/null; then
+          echo "$EXE: usage error: expecting an address, not a URL: \"$1\"" >&2
+          exit 2
+        fi
+
+        CLIENTS="$CLIENTS $1"
+      fi
+      shift # past argument
+      ;;
+  esac
+done
+
+if [ -n "$SHOW_HELP" ]; then
+    cat <<EOF
+Usage: $EXE [options] {allowed-clients}
+Options:
+  -p | --port NUM   proxy port (default: $DEFAULT_PROXY_PORT)
+  -v | --verbose    output extra information when running
+       --version    display version information and exit
+  -h | --help       display this help and exit
+allowed-clients:
+  CIDR addresses of clients allowed to use this proxy server
+  e.g. 192.168.0.0/16
+EOF
+    exit 0
+fi
+
+if [ -n "$SHOW_VERSION" ]; then
+  echo "$PROGRAM $VERSION"
+  exit 0
+fi
+
+if ! echo "$PROXY_PORT" | grep -E '^[0-9]+$' >/dev/null ; then
+  echo "$EXE: usage error: invalid number: \"$PROXY_PORT\"" >&2
+  exit 2
+fi
+if [ "$PROXY_PORT" -lt 1 ] || [ "$PROXY_PORT" -gt 65535 ]; then
+  echo "$EXE: usage error: invalid port number: $PROXY_PORT" >&2
+  exit 2
+fi
+
+if [ -z "$CLIENTS" ]; then
+  echo "$EXE: usage error: missing client hosts (-h for help)" >&2
+  exit 2
+fi
+
+#----------------------------------------------------------------
+# Detect Linux distribution
+
+DISTRO=unknown
+if [ -f '/etc/system-release' ]; then
+  DISTRO=$(head -1 /etc/system-release)
+fi
+
+if echo "$DISTRO" | grep '^CentOS Linux release 7' > /dev/null; then
+  :
+elif echo "$DISTRO" | grep '^CentOS Linux release 8' > /dev/null; then
+  :
+else
+  # Add additional elif-statements for tested distributions
+  echo "$EXE: error: unsupported system/distribution: $DISTRO" >&2
+  exit 1
+fi
+
+#----------------------------------------------------------------
+# Check for root privileges
+
+if [ "$(id -u)" -ne 0 ]; then
+  echo "$EXE: error: root privileges required" >&2
+  exit 1
+fi
+
+#----------------------------------------------------------------
+# Install Squid proxy server
+
+if ! rpm -q 'squid' >/dev/null; then
+
+  if [ -n "$VERBOSE" ]; then
+    echo "$EXE: yum installing \"squid\" package"
+  fi
+
+  if ! yum install -y -q squid; then
+    echo "$EXE: error: yum install failed" >&2
+    exit 1
+  fi
+fi
+
+#----------------------------------------------------------------
+# Configure Squid
+
+SQUID_CONF='/etc/squid/squid.conf'
+
+if [ -n "$VERBOSE" ]; then
+  echo "$EXE: creating \"$SQUID_CONF\""
+fi
+
+tee "$SQUID_CONF" >/dev/null <<EOF
+# Squid proxy configuration
+# $PROGRAM_INFO
+
+# Squid port
+http_port ${PROXY_PORT}
+
+#----------------
+# Access control
+
+# Addresses (CIDR) allowed to use this proxy (i.e. the client hosts)
+EOF
+
+for C in $CLIENTS; do
+  echo "acl client_nodes src $C" | tee -a "$SQUID_CONF" >/dev/null
+done
+
+tee -a "$SQUID_CONF" >/dev/null <<EOF
+
+# Destinations the proxy is allowed to access (i.e. the Stratum 1 replicas)
+#   Can be "dst IP_ADDR", "dstdomain .EXAMPLE.ORG" or "dstdom_regex REGEX"
+
+EOF
+
+for S1 in $STRATUM_ONE_SERVERS; do
+  echo "acl stratum_ones dstdomain $S1" | tee -a "$SQUID_CONF" >/dev/null
+done
+
+tee -a "$SQUID_CONF" >/dev/null <<EOF
+
+# Deny access to all except the stratum_ones ACL.
+http_access deny !stratum_ones
+
+# Allow from local client hosts and localhost
+http_access allow client_nodes
+http_access allow localhost
+
+# Finally, deny all others
+http_access deny all
+
+#----------------
+
+minimum_expiry_time 0
+maximum_object_size 1024 MB
+
+cache_mem 128 MB
+maximum_object_size_in_memory 128 KB
+
+# Disk cache (5 GB)
+cache_dir ufs /var/spool/squid 5000 16 256
+EOF
+
+#----------------------------------------------------------------
+# Check the Squid configuration
+
+if ! squid -k parse >/dev/null 2>&1; then
+  echo "$EXE: internal error: squid config is incorrect" >&2
+  exit 1
+fi
+
+#----------------------------------------------------------------
+# Start Squid and enable it to start when the host boots
+
+if [ -n "$VERBOSE" ]; then
+  echo "$EXE: starting and enabling squid.service"
+fi
+
+# Note: in case it was already running, use restart instead of start.
+if ! systemctl restart squid.service; then
+  echo "$EXE: error: squid start failed" >&2
+  exit 1
+fi
+
+if ! systemctl enable squid.service 2>/dev/null; then
+  echo "$EXE: error: squid enable failed" >&2
+  exit 1
+fi
+
+#----------------------------------------------------------------
+# Success
+
+if [ -n "$VERBOSE" ]; then
+    echo "$EXE: ok"
+fi
+
+#EOF
