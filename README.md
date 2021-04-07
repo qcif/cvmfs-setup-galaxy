@@ -1,6 +1,6 @@
-# CernVM-FS setup scripts for Galaxy Project CVMFS repositories
+# CernVM-FS setup for Galaxy Project CVMFS repositories
 
-Scripts for setting up CernVM-FS clients and CernVM-FS caching proxy
+Scripts for setting up CernVM-FS clients and caching proxy
 servers to use the _Galaxy Project_ CernVM-FS repositories. The
 [Galaxy Project](https://galaxyproject.org) produces a platform for
 bioinformatics workflows, and its data repositories contain genome
@@ -59,6 +59,7 @@ The scripts has been tested on:
 
 - CentOS 7
 - CentOS 8
+- CentOS Stream 8
 - Ubuntu 20.04
 - Ubuntu 18.04
 - Ubuntu 16.04

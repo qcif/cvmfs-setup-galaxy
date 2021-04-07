@@ -195,6 +195,8 @@ if echo "$DISTRO" | grep '^CentOS Linux release 7' > /dev/null; then
   :
 elif echo "$DISTRO" | grep '^CentOS Linux release 8' > /dev/null; then
   :
+elif echo "$DISTRO" | grep '^CentOS Stream release 8' > /dev/null; then
+  :
 elif [ "$DISTRO" = 'Ubuntu 20.04' ]; then
   :
 elif [ "$DISTRO" = 'Ubuntu 18.04' ]; then
@@ -215,6 +217,10 @@ fi
 #----------------------------------------------------------------
 # Install Squid proxy server
 
+# Use LOG file to suppress apt-get messages, only show on error
+# Unfortunately, "apt-get -q" and "yum install -q" still produces output.
+LOG="/tmp/${PROGRAM}.$$"
+
 if which yum >/dev/null; then
   # Installing for CentOS/RHEL
 
@@ -224,18 +230,17 @@ if which yum >/dev/null; then
       echo "$EXE: yum installing \"squid\" package"
     fi
 
-    if ! yum install -y -q squid; then
-      echo "$EXE: error: yum install failed" >&2
+    if ! yum install -y -q squid >$LOG 2>&1; then
+      cat $LOG
+      rm $LOG
+      echo "$EXE: error: yum install squid failed" >&2
       exit 1
     fi
+    rm $LOG
   fi
 
 elif which apt-get >/dev/null; then
   # Installing for Ubuntu
-
-  # Use LOG file to suppress apt-get messages, only show on error
-  # Unfortunately, "apt-get -q" still produces output.
-  LOG="/tmp/${PROGRAM}.$$"
 
   if [ -n "$VERBOSE" ]; then
     echo "$EXE: apt-get update"

@@ -225,6 +225,8 @@ if echo "$DISTRO" | grep '^CentOS Linux release 7' > /dev/null; then
   :
 elif echo "$DISTRO" | grep '^CentOS Linux release 8' > /dev/null; then
   :
+elif echo "$DISTRO" | grep '^CentOS Stream release 8' > /dev/null; then
+  :
 elif [ "$DISTRO" = 'Ubuntu 20.04' ]; then
   :
 elif [ "$DISTRO" = 'Ubuntu 18.04' ]; then
@@ -247,6 +249,10 @@ fi
 #----------------------------------------------------------------
 # Install CernVM-FS client software
 
+# Use LOG file to suppress apt-get messages, only show on error
+# Unfortunately, "apt-get -q" and "yum install -q" still produces output.
+LOG="/tmp/${PROGRAM}.$$"
+
 if which yum >/dev/null; then
   # Installing for CentOS/RHEL
 
@@ -256,15 +262,18 @@ if which yum >/dev/null; then
       # Setting up CernVM-FS YUM repository
 
       if [ -n "$VERBOSE" ]; then
-        echo "$EXE: yum installing \"cvmfs-release-latest\" package"
+        echo "$EXE: yum installing \"cvmfs-release-latest\" package from ecsft.cern.ch"
       fi
 
       if ! yum install -y -q \
-           https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest.noarch.rpm;
+           https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest.noarch.rpm >$LOG 2>&1;
       then
+        cat $LOG
+        rm $LOG
         echo "$EXE: error: yum install failed" >&2
         exit 1
       fi
+      rm $LOG
 
       if [ ! -e "$EXPECTING" ]; then
         # The expected file was not installed.
@@ -280,12 +289,10 @@ if which yum >/dev/null; then
       echo "$EXE: yum installing \"cvmfs\" package"
     fi
 
-    # Use LOG file to suppress GPG key messages, only show on error
-    LOG="/tmp/${PROGRAM}.$$"
-    if ! yum install -y -q cvmfs 2>$LOG; then
+    if ! yum install -y -q cvmfs >$LOG 2>&1; then
       cat $LOG
       rm $LOG
-      echo "$EXE: error: yum install failed" >&2
+      echo "$EXE: error: yum install cvmfs failed" >&2
       exit 1
     fi
     rm $LOG
@@ -312,10 +319,6 @@ elif which apt-get >/dev/null; then
   if [ -n "$VERBOSE" ]; then
     echo "$EXE: dpkg installing $DEB_FILE"
   fi
-
-  # Use LOG file to suppress apt-get messages, only show on error
-  # Unfortunately, "apt-get -q" still produces output.
-  LOG="/tmp/${PROGRAM}.$$"
 
   if ! dpkg --install "$DEB_FILE" >$LOG 2>&1; then
     cat $LOG
