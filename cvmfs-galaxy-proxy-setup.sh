@@ -28,6 +28,12 @@ EXE=$(basename "$0" .sh)
 #----------------------------------------------------------------
 # Constants
 
+DEFAULT_DISK_CACHE_SIZE_MB=5120
+DEFAULT_MEM_CACHE_SIZE_MB=256
+
+MIN_DISK_CACHE_SIZE_MB=128
+MIN_MEM_CACHE_SIZE_MB=10
+
 #----------------
 
 DEFAULT_PROXY_PORT=3128
@@ -62,6 +68,8 @@ set -e
 
 CLIENTS=
 PROXY_PORT=$DEFAULT_PROXY_PORT
+DISK_CACHE_SIZE_MB=$DEFAULT_DISK_CACHE_SIZE_MB
+MEM_CACHE_SIZE_MB=$DEFAULT_MEM_CACHE_SIZE_MB
 VERBOSE=
 SHOW_VERSION=
 SHOW_HELP=
@@ -73,6 +81,14 @@ do
       PROXY_PORT="$2"
       shift
       shift
+      ;;
+    -d|--disk-cache)
+      DISK_CACHE_SIZE_MB="$2"
+      shift; shift
+      ;;
+    -m|--mem-cache)
+      MEM_CACHE_SIZE_MB="$2"
+      shift; shift
       ;;
     -v|--verbose)
       VERBOSE=yes
@@ -113,13 +129,15 @@ if [ -n "$SHOW_HELP" ]; then
     cat <<EOF
 Usage: $EXE [options] {allowed-clients}
 Options:
-  -p | --port NUM   proxy port (default: $DEFAULT_PROXY_PORT)
-  -v | --verbose    output extra information when running
-       --version    display version information and exit
-  -h | --help       display this help and exit
+  -p | --port NUM       proxy port (default: $DEFAULT_PROXY_PORT)
+  -d | --disk-cache NUM size of disk cache in MiB (default: $DEFAULT_DISK_CACHE_SIZE_MB)
+  -m | --mem-cache NUM  size of memory cache in MiB (default: $DEFAULT_MEM_CACHE_SIZE_MB)
+  -v | --verbose        output extra information when running
+       --version        display version information and exit
+  -h | --help           display this help and exit
 allowed-clients:
   CIDR addresses of clients allowed to use this proxy server
-  e.g. 192.168.0.0/16
+  e.g. 192.168.0.0/16 172.16.0.0/12
 EOF
     exit 0
 fi
@@ -130,11 +148,29 @@ if [ -n "$SHOW_VERSION" ]; then
 fi
 
 if ! echo "$PROXY_PORT" | grep -E '^[0-9]+$' >/dev/null ; then
-  echo "$EXE: usage error: invalid number: \"$PROXY_PORT\"" >&2
+  echo "$EXE: usage error: invalid port number: \"$PROXY_PORT\"" >&2
   exit 2
 fi
 if [ "$PROXY_PORT" -lt 1 ] || [ "$PROXY_PORT" -gt 65535 ]; then
-  echo "$EXE: usage error: invalid port number: $PROXY_PORT" >&2
+  echo "$EXE: usage error:  port number out of range: $PROXY_PORT" >&2
+  exit 2
+fi
+
+if ! echo "$DISK_CACHE_SIZE_MB" | grep -E '^[0-9]+$' >/dev/null ; then
+  echo "$EXE: usage error: disk cache: invalid number: \"$DISK_CACHE_SIZE_MB\"" >&2
+  exit 2
+fi
+if [ "$DISK_CACHE_SIZE_MB" -lt $MIN_DISK_CACHE_SIZE_MB ]; then
+  echo "$EXE: usage error: disk cache is too small: $DISK_CACHE_SIZE_MB MiB" >&2
+  exit 2
+fi
+
+if ! echo "$MEM_CACHE_SIZE_MB" | grep -E '^[0-9]+$' >/dev/null ; then
+  echo "$EXE: usage error: memory cache: invalid number: \"$MEM_CACHE_SIZE_MB\"" >&2
+  exit 2
+fi
+if [ "$MEM_CACHE_SIZE_MB" -lt $MIN_MEM_CACHE_SIZE_MB ]; then
+  echo "$EXE: usage error: memory cache is too small: $MEM_CACHE_SIZE_MB MiB" >&2
   exit 2
 fi
 
@@ -238,11 +274,13 @@ http_access deny all
 minimum_expiry_time 0
 maximum_object_size 1024 MB
 
-cache_mem 128 MB
-maximum_object_size_in_memory 128 KB
+cache_mem ${MEM_CACHE_SIZE_MB} MB
+maximum_object_size_in_memory 16 MB
 
-# Disk cache (5 GB)
-cache_dir ufs /var/spool/squid 5000 16 256
+# Disk cache
+# cache_dir TYPE DIRECTORY-NAME FS-SPECIFIC-DATA [OPTIONS]
+# cache_dir ufs  DIRECTORY-NAME Mbytes L1 L2     [OPTIONS]
+cache_dir ufs /var/spool/squid ${DISK_CACHE_SIZE_MB} 16 256
 EOF
 
 #----------------------------------------------------------------

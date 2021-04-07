@@ -36,10 +36,10 @@ EXE=$(basename "$0" .sh)
 DEFAULT_PROXY_PORT=3128
 
 # Default cache size in MiB (should be between 4 GiB and 50 GiB)
-DEFAULT_CACHE_SIZE=4096  # 4 GiB
+DEFAULT_CACHE_SIZE_MB=4096  # 4 GiB
 
 # Minimum value allowed for --size option in MiB
-MIN_CACHE_SIZE=1024 # 1 GiB
+MIN_CACHE_SIZE_MB=1024 # 1 GiB
 
 #----------------
 
@@ -103,7 +103,7 @@ set -e
 # Command line arguments
 
 CVMFS_HTTP_PROXY=
-CVMFS_QUOTA_LIMIT=$DEFAULT_CACHE_SIZE
+CVMFS_QUOTA_LIMIT_MB=$DEFAULT_CACHE_SIZE_MB
 STATIC=
 VERBOSE=
 SHOW_VERSION=
@@ -113,7 +113,7 @@ while [ $# -gt 0 ]
 do
   case "$1" in
     -c|--cache-size)
-      CVMFS_QUOTA_LIMIT="$2"
+      CVMFS_QUOTA_LIMIT_MB="$2"
       shift # past argument
       shift # past value
       ;;
@@ -177,7 +177,7 @@ if [ -n "$SHOW_HELP" ]; then
   cat <<EOF
 Usage: $EXE [options] {proxies}
 Options:
-  -c | --cache-size NUM  size of cache in MiB (default: $DEFAULT_CACHE_SIZE)
+  -c | --cache-size NUM  size of cache in MiB (default: $DEFAULT_CACHE_SIZE_MB)
   -s | --static-config   configure $DATA_REPO only (not recommended)
   -d | --direct          no proxies, connect to Stratum 1 (not recommended)
   -v | --verbose         output extra information when running
@@ -195,12 +195,12 @@ if [ -n "$SHOW_VERSION" ]; then
   exit 0
 fi
 
-if ! echo "$CVMFS_QUOTA_LIMIT" | grep -E '^[0-9]+$' >/dev/null ; then
-  echo "$EXE: usage error: invalid number: \"$CVMFS_QUOTA_LIMIT\"" >&2
+if ! echo "$CVMFS_QUOTA_LIMIT_MB" | grep -E '^[0-9]+$' >/dev/null ; then
+  echo "$EXE: usage error: invalid number: \"$CVMFS_QUOTA_LIMIT_MB\"" >&2
   exit 2
 fi
-if [ "$CVMFS_QUOTA_LIMIT" -lt $MIN_CACHE_SIZE ]; then
-  echo "$EXE: usage error: cache is too small: $CVMFS_QUOTA_LIMIT MiB" >&2
+if [ "$CVMFS_QUOTA_LIMIT_MB" -lt $MIN_CACHE_SIZE_MB ]; then
+  echo "$EXE: usage error: cache is too small: $CVMFS_QUOTA_LIMIT_MB MiB" >&2
   exit 2
 fi
 
@@ -460,7 +460,7 @@ tee "$FILE" >/dev/null <<EOF
 # $EXE_INFO
 
 CVMFS_HTTP_PROXY=${CVMFS_HTTP_PROXY=DIRECT}
-CVMFS_QUOTA_LIMIT=${CVMFS_QUOTA_LIMIT}  # cache size in MiB (recommended: 4GB to 50GB)
+CVMFS_QUOTA_LIMIT=${CVMFS_QUOTA_LIMIT_MB}  # cache size in MiB (recommended: 4GB to 50GB)
 CVMFS_USE_GEOAPI=yes  # sort server list by geographic distance from client
 EOF
 
