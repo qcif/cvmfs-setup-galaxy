@@ -184,17 +184,24 @@ fi
 
 DISTRO=unknown
 if [ -f '/etc/system-release' ]; then
+  # RHEL/CentOS
   DISTRO=$(head -1 /etc/system-release)
+elif which lsb_release >/dev/null 2>&1; then
+  # Ubuntu
+  DISTRO="$(lsb_release --id --short) $(lsb_release --release --short)"
 fi
 
 if echo "$DISTRO" | grep '^CentOS Linux release 7' > /dev/null; then
   :
 elif echo "$DISTRO" | grep '^CentOS Linux release 8' > /dev/null; then
   :
+elif [ "$DISTRO" = 'Ubuntu 20.04' ]; then
+  :
+elif [ "$DISTRO" = 'Ubuntu 18.04' ]; then
+  :
 else
   # Add additional elif-statements for tested distributions
-  echo "$EXE: error: unsupported system/distribution: $DISTRO" >&2
-  exit 1
+  echo "$EXE: warning: untested system/distribution: $DISTRO" >&2
 fi
 
 #----------------------------------------------------------------
@@ -208,16 +215,56 @@ fi
 #----------------------------------------------------------------
 # Install Squid proxy server
 
-if ! rpm -q 'squid' >/dev/null; then
+if which yum >/dev/null; then
+  # Installing for CentOS/RHEL
+
+  if ! rpm -q 'squid' >/dev/null; then
+
+    if [ -n "$VERBOSE" ]; then
+      echo "$EXE: yum installing \"squid\" package"
+    fi
+
+    if ! yum install -y -q squid; then
+      echo "$EXE: error: yum install failed" >&2
+      exit 1
+    fi
+  fi
+
+elif which apt-get >/dev/null; then
+  # Installing for Ubuntu
+
+  # Use LOG file to suppress apt-get messages, only show on error
+  # Unfortunately, "apt-get -q" still produces output.
+  LOG="/tmp/${PROGRAM}.$$"
 
   if [ -n "$VERBOSE" ]; then
-    echo "$EXE: yum installing \"squid\" package"
+    echo "$EXE: apt-get update"
   fi
 
-  if ! yum install -y -q squid; then
-    echo "$EXE: error: yum install failed" >&2
+  if ! apt-get update >$LOG 2>&1; then
+    cat $LOG
+    rm $LOG
+    echo "$EXE: error: apt-get update failed" >&2
     exit 1
   fi
+
+  # Install Squid proxy server
+  
+  if [ -n "$VERBOSE" ]; then
+    echo "$EXE: apt-get install squid"
+  fi
+
+  if ! apt-get install -y squid >$LOG 2>&1; then
+    cat $LOG
+    rm $LOG
+    echo "$EXE: error: apt-get install squid failed" >&2
+    exit 1
+  fi
+  rm $LOG
+
+else
+  echo "$EXE: unsupported system: no yum or apt-get" >&2
+  exit 3
 fi
 
 #----------------------------------------------------------------
@@ -295,7 +342,7 @@ fi
 # Start Squid and enable it to start when the host boots
 
 if [ -n "$VERBOSE" ]; then
-  echo "$EXE: starting and enabling squid.service"
+  echo "$EXE: restarting and enabling squid.service"
 fi
 
 # Note: in case it was already running, use restart instead of start.

@@ -214,8 +214,10 @@ fi
 
 DISTRO=unknown
 if [ -f '/etc/system-release' ]; then
+  # RHEL/CentOS
   DISTRO=$(head -1 /etc/system-release)
 elif which lsb_release >/dev/null 2>&1; then
+  # Ubuntu
   DISTRO="$(lsb_release --id --short) $(lsb_release --release --short)"
 fi
 
@@ -231,8 +233,7 @@ elif [ "$DISTRO" = 'Ubuntu 16.04' ]; then
   :
 else
   # Add additional elif-statements for tested distributions
-  echo "$EXE: error: unsupported system/distribution: $DISTRO" >&2
-  exit 1
+  echo "$EXE: warning: untested system/distribution: $DISTRO" >&2
 fi
 
 #----------------------------------------------------------------
@@ -246,8 +247,8 @@ fi
 #----------------------------------------------------------------
 # Install CernVM-FS client software
 
-if echo "$DISTRO" | grep '^CentOS' >/dev/null; then
-  # Installing for CentOS
+if which yum >/dev/null; then
+  # Installing for CentOS/RHEL
 
   if ! rpm -q 'cvmfs' >/dev/null; then
     EXPECTING='/etc/yum.repos.d/cernvm.repo'
@@ -290,7 +291,7 @@ if echo "$DISTRO" | grep '^CentOS' >/dev/null; then
     rm $LOG
   fi
 
-elif echo "$DISTRO" | grep '^Ubuntu' >/dev/null; then
+elif which apt-get >/dev/null; then
   # Installing for Ubuntu
 
   # TODO: check if it is already installed
@@ -347,8 +348,9 @@ elif echo "$DISTRO" | grep '^Ubuntu' >/dev/null; then
     exit 1
   fi
   rm $LOG
+
 else
-  echo "$EXE: internal error: DISTRO=$DISTRO" >&2
+  echo "$EXE: unsupported system: no yum or apt-get" >&2
   exit 3
 fi
 
