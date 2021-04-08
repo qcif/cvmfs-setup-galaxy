@@ -31,9 +31,10 @@ The two scripts are for deploying _proxies_ and _clients_.
 
 ### Instructions
 
-1. Download one of the scripts to it, depending on if the host will be a proxy or a client.
+1. Download either the proxy or client setup script.
 2. Run the script.
-3. If the host is a client, start using the files from the CVMFS repositories.
+3. For proxies, clients can be created to use it.
+   For clients, start using the files from the CVMFS repositories.
 
 ### Common options
 
@@ -83,6 +84,9 @@ The script will:
 - install the Squid proxy server
 - configure the Squid proxy server
 - start and enable the Squid proxy server
+
+The Squid proxy server may need to be optimised for the environment is
+is being used in.
 
 ### Proxy port number
 

@@ -89,8 +89,8 @@ owIDAQAB
 
 #----------------------------------------------------------------
 
-#TIMESTAMP=$(date '+%F %T %Z')s
-#PROGRAM_INFO="Created by $PROGRAM $VERSION [$TIMESTAMP]"
+TIMESTAMP=$(date '+%F %T %Z')
+PROGRAM_INFO="Created by $PROGRAM $VERSION [$TIMESTAMP]"
 
 #----------------------------------------------------------------
 # Error handling
@@ -118,6 +118,10 @@ do
       shift # past value
       ;;
     -d|--direct)
+      if [ -n "$CVMFS_HTTP_PROXY" ]; then
+        echo "$EXE: usage error: do not use --direct with proxies" >&2
+        exit 2
+      fi
       CVMFS_HTTP_PROXY=DIRECT
       shift # past argument
       ;;
@@ -144,6 +148,11 @@ do
         exit 2
       else
         # Use as a proxy address
+
+        if [ "$CVMFS_HTTP_PROXY" = 'DIRECT' ]; then
+          echo "$EXE: usage error: do not provide proxies with --direct" >&2
+          exit 2
+        fi
 
         if echo "$1" | grep '^http://' >/dev/null; then
           echo "$EXE: usage error: expecting an address, not a URL: \"$1\"" >&2
@@ -205,6 +214,9 @@ if [ "$CVMFS_QUOTA_LIMIT_MB" -lt $MIN_CACHE_SIZE_MB ]; then
 fi
 
 if [ -z "$CVMFS_HTTP_PROXY" ]; then
+  # This environment variable should either be a list of proxies (host:port)
+  # separated by semicolons, or the value "DIRECT". When not using DIRECT,
+  # there must be at least one proxy.
   echo "$EXE: usage error: missing proxies (-h for help)" >&2
   exit 2
 fi
@@ -371,6 +383,19 @@ if [ ! -e "$ORG_KEY_DIR" ]; then
 fi
 
 #----------------------------------------------------------------
+# Configure CernVM-FS
+
+# Construct the value for CVMFS_SERVER_URL from Stratum 1 replica servers
+
+CVMFS_SERVER_URL=
+for SERVER in $STRATUM_ONE_SERVERS; do
+  URL="http://$SERVER/cvmfs/@fqrn@"
+  if [ -z "$CVMFS_SERVER_URL" ]; then
+    CVMFS_SERVER_URL=$URL
+  else
+    CVMFS_SERVER_URL="$CVMFS_SERVER_URL;$URL"
+  fi
+done
 
 if [ -z "$STATIC" ]; then
   #----------------
@@ -392,20 +417,9 @@ if [ -z "$STATIC" ]; then
     echo "$EXE: creating \"$FILE\""
   fi
 
-  # Build CVMFS_SERVER_URL value from Stratum 1 replica servers
-
-  CVMFS_SERVER_URL=
-  for SERVER in $STRATUM_ONE_SERVERS; do
-    URL="http://$SERVER/cvmfs/@fqrn@"
-    if [ -z "$CVMFS_SERVER_URL" ]; then
-      CVMFS_SERVER_URL=$URL
-    else
-      CVMFS_SERVER_URL="$CVMFS_SERVER_URL;$URL"
-    fi
-  done
-
   tee "$FILE" >/dev/null <<EOF
-# $EXE_INFO
+# $PROGRAM_INFO
+# Dynamic configuration mode
 
 CVMFS_SERVER_URL="$CVMFS_SERVER_URL"
 CVMFS_PUBLIC_KEY="$CONFIG_REPO_KEY_FILE"
@@ -419,15 +433,23 @@ EOF
   fi
 
   tee "$FILE" >/dev/null <<EOF
-# $EXE_INFO
+# $PROGRAM_INFO
+# Dynamic configuration mode
 
 CVMFS_CONFIG_REPOSITORY="$CONFIG_REPO"
 CVMFS_DEFAULT_DOMAIN="$ORG"
 EOF
 
+  # Remove static config files, if any
+
+  rm -f "$ORG_KEY_DIR/$DATA_REPO.pub"
+  rm -f "/etc/cvmfs/domain.d/${ORG}.conf"
+
 else
   #----------------
   # Static
+
+  # Add public key for the repository
 
   FILE="$ORG_KEY_DIR/$DATA_REPO.pub"
   if [ -n "$VERBOSE" ]; then
@@ -444,11 +466,18 @@ else
   fi
 
   sudo tee "$FILE" >/dev/null <<EOF
-# $EXE_INFO
+# $PROGRAM_INFO
+# Static configuration mode
 
 CVMFS_SERVER_URL="$CVMFS_SERVER_URL"
 CVMFS_KEYS_DIR="/etc/cvmfs/keys/$ORG"
 EOF
+
+  # Remove dynamic config files, if any
+
+  rm -f "$ORG_KEY_DIR/$CONFIG_REPO.pub"
+  rm -f "/etc/cvmfs/config.d/$CONFIG_REPO.conf"
+  rm -f "/etc/cvmfs/default.d/80-$ORG-cvmfs.conf"
 
 fi
 
@@ -462,9 +491,9 @@ if [ -n "$VERBOSE" ]; then
 fi
 
 tee "$FILE" >/dev/null <<EOF
-# $EXE_INFO
+# $PROGRAM_INFO
 
-CVMFS_HTTP_PROXY=${CVMFS_HTTP_PROXY=DIRECT}
+CVMFS_HTTP_PROXY=${CVMFS_HTTP_PROXY}
 CVMFS_QUOTA_LIMIT=${CVMFS_QUOTA_LIMIT_MB}  # cache size in MiB (recommended: 4GB to 50GB)
 CVMFS_USE_GEOAPI=yes  # sort server list by geographic distance from client
 EOF
