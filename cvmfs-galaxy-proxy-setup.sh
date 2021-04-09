@@ -24,19 +24,20 @@ PROGRAM='cvmfs-galaxy-proxy-setup'
 VERSION='1.0.0'
 
 EXE=$(basename "$0" .sh)
+EXE_EXT=$(basename "$0")
 
 #----------------------------------------------------------------
 # Constants
+
+#----------------
+
+DEFAULT_PROXY_PORT=3128
 
 DEFAULT_DISK_CACHE_SIZE_MB=5120
 DEFAULT_MEM_CACHE_SIZE_MB=256
 
 MIN_DISK_CACHE_SIZE_MB=128
 MIN_MEM_CACHE_SIZE_MB=10
-
-#----------------
-
-DEFAULT_PROXY_PORT=3128
 
 #----------------
 # The Stratum 1 servers
@@ -127,7 +128,7 @@ done
 
 if [ -n "$SHOW_HELP" ]; then
     cat <<EOF
-Usage: $EXE [options] {allowed-clients}
+Usage: $EXE_EXT [options] {allowed-clients}
 Options:
   -p | --port NUM       proxy port (default: $DEFAULT_PROXY_PORT)
   -d | --disk-cache NUM size of disk cache in MiB (default: $DEFAULT_DISK_CACHE_SIZE_MB)
@@ -180,16 +181,20 @@ if [ -z "$CLIENTS" ]; then
 fi
 
 #----------------------------------------------------------------
-# Detect Linux distribution
+# Detect tested systems
 
 DISTRO=unknown
 if [ -f '/etc/system-release' ]; then
-  # RHEL/CentOS
+  # Fedora based
   DISTRO=$(head -1 /etc/system-release)
 elif which lsb_release >/dev/null 2>&1; then
-  # Ubuntu
+  # Debian based
   DISTRO="$(lsb_release --id --short) $(lsb_release --release --short)"
-fi
+elif which uname >/dev/null 2>&1; then
+  # Other
+  DISTRO="$(uname -s) $(uname -r)"
+else
+  DISTRO=unknown
 
 if echo "$DISTRO" | grep '^CentOS Linux release 7' > /dev/null; then
   :
@@ -201,9 +206,11 @@ elif [ "$DISTRO" = 'Ubuntu 20.04' ]; then
   :
 elif [ "$DISTRO" = 'Ubuntu 18.04' ]; then
   :
+elif [ "$DISTRO" = 'Ubuntu 16.04' ]; then
+  :
 else
-  # Add additional elif-statements for tested distributions
-  echo "$EXE: warning: untested system/distribution: $DISTRO" >&2
+  # Add additional elif-statements for tested systems
+  echo "$EXE: warning: untested system: $DISTRO" >&2
 fi
 
 #----------------------------------------------------------------
@@ -221,26 +228,40 @@ fi
 # Unfortunately, "apt-get -q" and "yum install -q" still produces output.
 LOG="/tmp/${PROGRAM}.$$"
 
-if which yum >/dev/null; then
-  # Installing for CentOS/RHEL
+_yum_install() {
+  PKG="$1"
 
-  if ! rpm -q 'squid' >/dev/null; then
+  if ! rpm -q $PKG >/dev/null ; then
+    # Not already installed
 
     if [ -n "$VERBOSE" ]; then
-      echo "$EXE: yum installing \"squid\" package"
+      echo "$EXE: yum install: $PKG"
     fi
 
-    if ! yum install -y -q squid >$LOG 2>&1; then
+    if ! yum install -y $PKG >$LOG 2>&1; then
       cat $LOG
       rm $LOG
-      echo "$EXE: error: yum install squid failed" >&2
+      echo "$EXE: error: yum install: $PKG failed" >&2
       exit 1
     fi
     rm $LOG
+
+  else
+    if [ -n "$VERBOSE" ]; then
+      echo "$EXE: package already installed: $PKG"
+    fi
   fi
+}
+
+#----------------
+
+if which yum >/dev/null; then
+  # Installing for Fedora based systems
+
+  _yum_install squid
 
 elif which apt-get >/dev/null; then
-  # Installing for Ubuntu
+  # Installing for Debian based systems
 
   if [ -n "$VERBOSE" ]; then
     echo "$EXE: apt-get update"
@@ -249,20 +270,20 @@ elif which apt-get >/dev/null; then
   if ! apt-get update >$LOG 2>&1; then
     cat $LOG
     rm $LOG
-    echo "$EXE: error: apt-get update failed" >&2
+    echo "$EXE: error: apt-get update: failed" >&2
     exit 1
   fi
 
   # Install Squid proxy server
-  
+
   if [ -n "$VERBOSE" ]; then
-    echo "$EXE: apt-get install squid"
+    echo "$EXE: apt-get install: squid"
   fi
 
   if ! apt-get install -y squid >$LOG 2>&1; then
     cat $LOG
     rm $LOG
-    echo "$EXE: error: apt-get install squid failed" >&2
+    echo "$EXE: error: apt-get install: squid failed" >&2
     exit 1
   fi
   rm $LOG
@@ -365,7 +386,7 @@ fi
 # Success
 
 if [ -n "$VERBOSE" ]; then
-    echo "$EXE: ok"
+  echo "$EXE: ok"
 fi
 
 #EOF

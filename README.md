@@ -85,7 +85,7 @@ The script will:
 - configure the Squid proxy server
 - start and enable the Squid proxy server
 
-The Squid proxy server may need to be optimised for the environment is
+The Squid proxy server may need to be optimised for the environment it
 is being used in.
 
 ### Proxy port number

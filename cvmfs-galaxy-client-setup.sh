@@ -28,6 +28,7 @@ PROGRAM='cvmfs-galaxy-client-setup'
 VERSION='1.0.0'
 
 EXE=$(basename "$0" .sh)
+EXE_EXT=$(basename "$0")
 
 #----------------------------------------------------------------
 # Constants
@@ -43,9 +44,24 @@ MIN_CACHE_SIZE_MB=1024 # 1 GiB
 
 #----------------
 
+# Header inserted into generated files
+PROGRAM_INFO="Created by $PROGRAM $VERSION [$(date '+%F %T %Z')]"
+
+#----------------
+# Repository specific
+
 ORG=galaxyproject.org
 
-CONFIG_REPO=cvmfs-config.galaxyproject.org
+STRATUM_1_HOSTS="
+  cvmfs1-psu0.galaxyproject.org \
+  cvmfs1-iu0.galaxyproject.org \
+  cvmfs1-tacc0.galaxyproject.org \
+  cvmfs1-ufr0.galaxyproject.eu \
+  cvmfs1-mel0.gvl.org.au"
+
+# For dynamic configuration: the config repository
+
+CONFIG_REPO=cvmfs-config.$ORG
 
 CONFIG_REPO_KEY='-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuJZTWTY3/dBfspFKifv8
@@ -58,23 +74,13 @@ dQIDAQAB
 -----END PUBLIC KEY-----
 '
 
-STRATUM_ONE_SERVERS="
-  cvmfs1-psu0.galaxyproject.org \
-  cvmfs1-iu0.galaxyproject.org \
-  cvmfs1-tacc0.galaxyproject.org \
-  cvmfs1-ufr0.galaxyproject.eu \
-  cvmfs1-mel0.gvl.org.au"
-
-#----------------
-# For static configuration
+# For static configuration: the data repository
 #
 # This script can also be used to statically configure a single
 # repository. That is, not use the dynamic configurations from
-# cvmfs-config.galaxyproject.org.
-#
-# Normally, this is not recommended.
+# the CONFIG_REPO. Normally, this is not recommended.
 
-DATA_REPO='data.galaxyproject.org'
+DATA_REPO=data.$ORG
 
 DATA_REPO_KEY='-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5LHQuKWzcX5iBbCGsXGt
@@ -88,11 +94,6 @@ owIDAQAB
 '
 
 #----------------------------------------------------------------
-
-TIMESTAMP=$(date '+%F %T %Z')
-PROGRAM_INFO="Created by $PROGRAM $VERSION [$TIMESTAMP]"
-
-#----------------------------------------------------------------
 # Error handling
 
 # Exit immediately if a simple command exits with a non-zero status.
@@ -102,8 +103,8 @@ set -e
 #----------------------------------------------------------------
 # Command line arguments
 
-CVMFS_HTTP_PROXY=
 CVMFS_QUOTA_LIMIT_MB=$DEFAULT_CACHE_SIZE_MB
+CVMFS_HTTP_PROXY=
 STATIC=
 VERBOSE=
 SHOW_VERSION=
@@ -184,7 +185,7 @@ done
 
 if [ -n "$SHOW_HELP" ]; then
   cat <<EOF
-Usage: $EXE [options] {proxies}
+Usage: $EXE_EXT [options] {proxies}
 Options:
   -c | --cache-size NUM  size of cache in MiB (default: $DEFAULT_CACHE_SIZE_MB)
   -s | --static-config   configure $DATA_REPO only (not recommended)
@@ -204,6 +205,8 @@ if [ -n "$SHOW_VERSION" ]; then
   exit 0
 fi
 
+#----------------
+
 if ! echo "$CVMFS_QUOTA_LIMIT_MB" | grep -E '^[0-9]+$' >/dev/null ; then
   echo "$EXE: usage error: invalid number: \"$CVMFS_QUOTA_LIMIT_MB\"" >&2
   exit 2
@@ -222,15 +225,19 @@ if [ -z "$CVMFS_HTTP_PROXY" ]; then
 fi
 
 #----------------------------------------------------------------
-# Detect Linux distribution
+# Detect tested systems
 
-DISTRO=unknown
 if [ -f '/etc/system-release' ]; then
-  # RHEL/CentOS
+  # Fedora based
   DISTRO=$(head -1 /etc/system-release)
 elif which lsb_release >/dev/null 2>&1; then
-  # Ubuntu
+  # Debian based
   DISTRO="$(lsb_release --id --short) $(lsb_release --release --short)"
+elif which uname >/dev/null 2>&1; then
+  # Other
+  DISTRO="$(uname -s) $(uname -r)"
+else
+  DISTRO=unknown
 fi
 
 if echo "$DISTRO" | grep '^CentOS Linux release 7' > /dev/null; then
@@ -246,8 +253,8 @@ elif [ "$DISTRO" = 'Ubuntu 18.04' ]; then
 elif [ "$DISTRO" = 'Ubuntu 16.04' ]; then
   :
 else
-  # Add additional elif-statements for tested distributions
-  echo "$EXE: warning: untested system/distribution: $DISTRO" >&2
+  # Add additional elif-statements for tested systems
+  echo "$EXE: warning: untested system: $DISTRO" >&2
 fi
 
 #----------------------------------------------------------------
@@ -259,33 +266,51 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 #----------------------------------------------------------------
-# Install CernVM-FS client software
+# Install CernVM-FS client
 
 # Use LOG file to suppress apt-get messages, only show on error
 # Unfortunately, "apt-get -q" and "yum install -q" still produces output.
 LOG="/tmp/${PROGRAM}.$$"
 
-if which yum >/dev/null; then
-  # Installing for CentOS/RHEL
+_yum_install() {
+  PKG="$1"
 
-  if ! rpm -q 'cvmfs' >/dev/null; then
+  if ! rpm -q $PKG >/dev/null ; then
+    # Not already installed
+
+    if [ -n "$VERBOSE" ]; then
+      echo "$EXE: yum install: $PKG"
+    fi
+
+    if ! yum install -y $PKG >$LOG 2>&1; then
+      cat $LOG
+      rm $LOG
+      echo "$EXE: error: yum install: $PKG failed" >&2
+      exit 1
+    fi
+    rm $LOG
+
+  else
+    if [ -n "$VERBOSE" ]; then
+      echo "$EXE: package already installed: $PKG"
+    fi
+  fi
+}
+
+#----------------
+
+if which yum >/dev/null; then
+  # Installing for Fedora based systems
+
+  if ! rpm -q cvmfs >/dev/null; then
+    # Need to install cvmfs package, which first needs cvmfs-release-latest
+
+    # Setup CernVM-FS YUM repository (if needed)
+
     EXPECTING='/etc/yum.repos.d/cernvm.repo'
     if [ ! -e "$EXPECTING" ]; then
-      # Setting up CernVM-FS YUM repository
 
-      if [ -n "$VERBOSE" ]; then
-        echo "$EXE: yum installing \"cvmfs-release-latest\" package from ecsft.cern.ch"
-      fi
-
-      if ! yum install -y -q \
-           https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest.noarch.rpm >$LOG 2>&1;
-      then
-        cat $LOG
-        rm $LOG
-        echo "$EXE: error: yum install failed" >&2
-        exit 1
-      fi
-      rm $LOG
+      _yum_install https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest.noarch.rpm
 
       if [ ! -e "$EXPECTING" ]; then
         # The expected file was not installed.
@@ -293,25 +318,18 @@ if which yum >/dev/null; then
         # has been installed or not needs to be changed.
         echo "$EXE: warning: file not found: $EXPECTING" >&2
       fi
-    fi
+    fi # if [ ! -e "$EXPECTING" ]
 
     # Installing cvmfs package
 
-    if [ -n "$VERBOSE" ]; then
-      echo "$EXE: yum installing \"cvmfs\" package"
-    fi
+    _yum_install cvmfs
 
-    if ! yum install -y -q cvmfs >$LOG 2>&1; then
-      cat $LOG
-      rm $LOG
-      echo "$EXE: error: yum install cvmfs failed" >&2
-      exit 1
-    fi
-    rm $LOG
+  else
+    echo "$EXE: package already installed: cvmfs"
   fi
 
 elif which apt-get >/dev/null; then
-  # Installing for Ubuntu
+  # Installing for Debian based systems
 
   # TODO: check if it is already installed
 
@@ -370,13 +388,12 @@ else
 fi
 
 #----------------------------------------------------------------
-# Create key directory for organisation
+# Create directory for storing the organisation's keys
 
 ORG_KEY_DIR="/etc/cvmfs/keys/$ORG"
 
 if [ ! -e "$ORG_KEY_DIR" ]; then
-  # Create the keys/org directory
-  if ! mkdir /etc/cvmfs/keys/$ORG; then
+  if ! mkdir "$ORG_KEY_DIR"; then
     echo "$EXE: error: could not create directory: $ORG_KEY_DIR" >&2
     exit 1
   fi
@@ -385,11 +402,11 @@ fi
 #----------------------------------------------------------------
 # Configure CernVM-FS
 
-# Construct the value for CVMFS_SERVER_URL from Stratum 1 replica servers
+# Construct the value for CVMFS_SERVER_URL from Stratum 1 replica hosts
 
 CVMFS_SERVER_URL=
-for SERVER in $STRATUM_ONE_SERVERS; do
-  URL="http://$SERVER/cvmfs/@fqrn@"
+for HOST in $STRATUM_1_HOSTS; do
+  URL="http://$HOST/cvmfs/@fqrn@"
   if [ -z "$CVMFS_SERVER_URL" ]; then
     CVMFS_SERVER_URL=$URL
   else
@@ -425,7 +442,7 @@ CVMFS_SERVER_URL="$CVMFS_SERVER_URL"
 CVMFS_PUBLIC_KEY="$CONFIG_REPO_KEY_FILE"
 EOF
 
-  # Configure CernVM-FS to use the configurations from the config-repository
+  # Configure CernVM-FS to use the configurations from config-repository
 
   FILE="/etc/cvmfs/default.d/80-$ORG-cvmfs.conf"
   if [ -n "$VERBOSE" ]; then
