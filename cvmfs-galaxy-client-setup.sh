@@ -103,9 +103,9 @@ set -e
 #----------------------------------------------------------------
 # Command line arguments
 
-CVMFS_QUOTA_LIMIT_MB=$DEFAULT_CACHE_SIZE_MB
 CVMFS_HTTP_PROXY=
 STATIC=
+CVMFS_QUOTA_LIMIT_MB=$DEFAULT_CACHE_SIZE_MB
 VERBOSE=
 SHOW_VERSION=
 SHOW_HELP=
@@ -113,11 +113,6 @@ SHOW_HELP=
 while [ $# -gt 0 ]
 do
   case "$1" in
-    -c|--cache-size)
-      CVMFS_QUOTA_LIMIT_MB="$2"
-      shift # past argument
-      shift # past value
-      ;;
     -d|--direct)
       if [ -n "$CVMFS_HTTP_PROXY" ]; then
         echo "$EXE: usage error: do not use --direct with proxies" >&2
@@ -129,6 +124,11 @@ do
     -s|--static-config)
       STATIC=yes
       shift;
+      ;;
+    -c|--cache-size)
+      CVMFS_QUOTA_LIMIT_MB="$2"
+      shift # past argument
+      shift # past value
       ;;
     -v|--verbose)
       VERBOSE=yes
@@ -425,7 +425,8 @@ if [ -z "$STATIC" ]; then
     echo "$EXE: creating \"$CONFIG_REPO_KEY_FILE\""
   fi
 
-  echo "$CONFIG_REPO_KEY" | tee "$CONFIG_REPO_KEY_FILE" >/dev/null
+  echo "$CONFIG_REPO_KEY" > "$CONFIG_REPO_KEY_FILE"
+  chmod 644 "$CONFIG_REPO_KEY_FILE"
 
   # Create configuration for the config-repository
 
@@ -434,7 +435,7 @@ if [ -z "$STATIC" ]; then
     echo "$EXE: creating \"$FILE\""
   fi
 
-  tee "$FILE" >/dev/null <<EOF
+  cat > "$FILE" <<EOF
 # $PROGRAM_INFO
 # Dynamic configuration mode
 
@@ -449,7 +450,7 @@ EOF
     echo "$EXE: creating \"$FILE\""
   fi
 
-  tee "$FILE" >/dev/null <<EOF
+  cat > "$FILE" <<EOF
 # $PROGRAM_INFO
 # Dynamic configuration mode
 
@@ -468,12 +469,13 @@ else
 
   # Add public key for the repository
 
-  FILE="$ORG_KEY_DIR/$DATA_REPO.pub"
+  REPO_PUBKEY_FILE="$ORG_KEY_DIR/$DATA_REPO.pub"
   if [ -n "$VERBOSE" ]; then
-    echo "$EXE: creating \"$FILE\""
+    echo "$EXE: creating \"$REPO_PUBKEY_FILE\""
   fi
 
-  echo "$DATA_REPO_KEY" |tee "$FILE" >/dev/null
+  echo "$DATA_REPO_KEY" > "$REPO_PUBKEY_FILE"
+  chmod 600 "$REPO_PUBKEY_FILE"
 
   # Create domain.d/org.conf
 
@@ -482,7 +484,7 @@ else
     echo "$EXE: creating \"$FILE\""
   fi
 
-  sudo tee "$FILE" >/dev/null <<EOF
+  cat > "$FILE" <<EOF
 # $PROGRAM_INFO
 # Static configuration mode
 
@@ -507,7 +509,7 @@ if [ -n "$VERBOSE" ]; then
   echo "$EXE: creating \"$FILE\""
 fi
 
-tee "$FILE" >/dev/null <<EOF
+cat > "$FILE" <<EOF
 # $PROGRAM_INFO
 
 CVMFS_HTTP_PROXY=${CVMFS_HTTP_PROXY}
@@ -516,9 +518,9 @@ CVMFS_USE_GEOAPI=yes  # sort server list by geographic distance from client
 EOF
 
 if [ -n "$STATIC" ]; then
-  # Extra config for static repository
-  echo "" | tee -a "$FILE" >/dev/null
-  echo "CVMFS_REPOSITORIES=\"$DATA_REPO\"" | tee -a "$FILE" >/dev/null
+  # Extra config needed for a static repository
+  echo "" >> "$FILE"
+  echo "CVMFS_REPOSITORIES=\"$DATA_REPO\"" >> "$FILE"
 fi
 
 #----------------------------------------------------------------

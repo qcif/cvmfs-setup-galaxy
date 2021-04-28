@@ -8,8 +8,8 @@ sequence builds, associated prebuilt indexes, tools and containers.
 
 These scripts allow the Galaxy Project CernVM-FS repositories to be
 used without needing Ansible. Normally, Ansible is used by the Galaxy
-Project to setup CernVM-FS, but if you don't want to use Ansible these
-scripts could be used.
+Project to setup CernVM-FS on a Galaxy server, but if you don't want
+to use Ansible these scripts could be used.
 
 These are unofficial scripts and are not endorsed by the Galaxy
 Project.
@@ -18,14 +18,23 @@ These scripts are provided on an "as is" basis.
 
 ## Overview
 
-CernVM-FS repositories are deployed as a single Stratum 0 master
-server, where files in the repository are modified, and Stratum 1
-replicas.
+CernVM-FS repositories are deployed as a single _Stratum 0 central
+server_, where the files in the repository are modified.
 
-Typically, an organisation should have a _proxy_ server, which
-downloads files from the Stratum 1 servers. Hosts using the repository
-are the _clients_, and they should download files from the local
-_proxy_.
+And there are multiple _Stratum 1 replicas_, which are complete copies
+of the files from Stratum 0 central. These are for reducing the load
+on the Stratum 0 central server, and also to improve performance and
+redundancy.
+
+Typically, an organisation should have one or more _proxy_ servers,
+which caches a subset of the files from the Stratum 1 servers.  It
+only downloads and caches those files that have been requested by the
+clients.
+
+Hosts that use the repository are the _clients_. They should only
+download files from a local _proxy_, to reduce the load on the
+Stratum 1 replica servers, and for improved performance and
+redundancy.
 
 The two scripts are for deploying _proxies_ and _clients_.
 
@@ -37,6 +46,8 @@ The two scripts are for deploying _proxies_ and _clients_.
    For clients, start using the files from the CVMFS repositories.
 
 ### Common options
+
+Both scripts support these options.
 
 #### Help
 
@@ -76,8 +87,8 @@ $ sudo ./cvmfs-galaxy-proxy-setup.sh CLIENT_HOSTS
 The _client hosts_ indicate which hosts can connect to the proxy. It
 must include all the machines that will be clients, otherwise they
 won't be able to use the proxy. Provide one or more CIDR values
-(e.g. "192.168.0.0/16 172.16.0.0/12 203.101.224.0/20") or individual
-IP addresses or hostnames.
+(e.g. "192.168.0.0/16 172.16.0.0/12") or individual IP addresses or
+hostnames.
 
 The script will:
 
@@ -92,6 +103,10 @@ is being used in.
 
 The `--port` option can be used to specify which port number the Squid
 proxy will be listening on. By default, port 3128 is used.
+
+Important: firewalls must allow the client hosts to connect to port on
+the proxy host.
+
 
 ### Proxy cache sizes
 

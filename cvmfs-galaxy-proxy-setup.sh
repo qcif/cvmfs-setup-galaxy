@@ -127,7 +127,13 @@ do
 done
 
 if [ -n "$SHOW_HELP" ]; then
-    cat <<EOF
+  if ip addr | grep 203.101.239.255 >/dev/null ; then
+    EXAMPLE_CLIENTS="203.101.224.0/20" # QRIScloud specific example
+  else
+    EXAMPLE_CLIENTS="192.168.0.0/16 172.16.0.0/12"
+  fi
+
+  cat <<EOF
 Usage: $EXE_EXT [options] {allowed-clients}
 Options:
   -p | --port NUM       proxy port (default: $DEFAULT_PROXY_PORT)
@@ -138,9 +144,9 @@ Options:
   -h | --help           display this help and exit
 allowed-clients:
   CIDR addresses of clients allowed to use this proxy server
-  e.g. 192.168.0.0/16 172.16.0.0/12
+  e.g. $EXAMPLE_CLIENTS
 EOF
-    exit 0
+  exit 0
 fi
 
 if [ -n "$SHOW_VERSION" ]; then
