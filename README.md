@@ -104,7 +104,7 @@ is being used in.
 The `--port` option can be used to specify which port number the Squid
 proxy will be listening on. By default, port 3128 is used.
 
-Important: firewalls must allow the client hosts to connect to port on
+Important: firewalls must allow the client hosts to connect to the port on
 the proxy host.
 
 

@@ -21,7 +21,7 @@
 #================================================================
 
 PROGRAM='cvmfs-galaxy-proxy-setup'
-VERSION='1.0.0'
+VERSION='1.0.1'
 
 EXE=$(basename "$0" .sh)
 EXE_EXT=$(basename "$0")
@@ -201,6 +201,7 @@ elif which uname >/dev/null 2>&1; then
   DISTRO="$(uname -s) $(uname -r)"
 else
   DISTRO=unknown
+fi
 
 if echo "$DISTRO" | grep '^CentOS Linux release 7' > /dev/null; then
   :
