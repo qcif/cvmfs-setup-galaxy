@@ -25,7 +25,7 @@
 #================================================================
 
 PROGRAM='cvmfs-galaxy-client-setup'
-VERSION='1.0.0'
+VERSION='1.1.0'
 
 EXE=$(basename "$0" .sh)
 EXE_EXT=$(basename "$0")
@@ -106,6 +106,7 @@ set -e
 CVMFS_HTTP_PROXY=
 STATIC=
 CVMFS_QUOTA_LIMIT_MB=$DEFAULT_CACHE_SIZE_MB
+QUIET=
 VERBOSE=
 SHOW_VERSION=
 SHOW_HELP=
@@ -129,6 +130,10 @@ do
       CVMFS_QUOTA_LIMIT_MB="$2"
       shift # past argument
       shift # past value
+      ;;
+    -q|--quiet)
+      QUIET=yes
+      shift # past argument
       ;;
     -v|--verbose)
       VERBOSE=yes
@@ -183,6 +188,9 @@ do
   esac
 done
 
+#----------------
+# Help and version options
+
 if [ -n "$SHOW_HELP" ]; then
   cat <<EOF
 Usage: $EXE_EXT [options] {proxies}
@@ -190,6 +198,7 @@ Options:
   -c | --cache-size NUM  size of cache in MiB (default: $DEFAULT_CACHE_SIZE_MB)
   -s | --static-config   configure $DATA_REPO only (not recommended)
   -d | --direct          no proxies, connect to Stratum 1 (not recommended)
+  -q | --quiet           output nothing unless an error occurs
   -v | --verbose         output extra information when running
        --version         display version information and exit
   -h | --help            display this help and exit
@@ -206,6 +215,12 @@ if [ -n "$SHOW_VERSION" ]; then
 fi
 
 #----------------
+# Other options
+
+if [ -n "$VERBOSE" ] && [ -n "$QUIET" ]; then
+  # Verbose overrides quiet, if both are specified
+  QUIET=
+fi
 
 if ! echo "$CVMFS_QUOTA_LIMIT_MB" | grep -E '^[0-9]+$' >/dev/null ; then
   echo "$EXE: usage error: invalid number: \"$CVMFS_QUOTA_LIMIT_MB\"" >&2
@@ -278,7 +293,7 @@ _yum_install() {
   if ! rpm -q $PKG >/dev/null ; then
     # Not already installed
 
-    if [ -n "$VERBOSE" ]; then
+    if [ -z "$QUIET" ]; then
       echo "$EXE: yum install: $PKG"
     fi
 
@@ -288,10 +303,13 @@ _yum_install() {
       echo "$EXE: error: yum install: $PKG failed" >&2
       exit 1
     fi
+    if [ -n "$VERBOSE" ]; then
+      cat $LOG
+    fi
     rm $LOG
 
   else
-    if [ -n "$VERBOSE" ]; then
+    if [ -z "$QUIET" ]; then
       echo "$EXE: package already installed: $PKG"
     fi
   fi
@@ -335,7 +353,7 @@ elif which apt-get >/dev/null; then
 
   URL=https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest_all.deb
 
-  if [ -n "$VERBOSE" ]; then
+  if [ -z "$QUIET" ]; then
     echo "$EXE: downloading $URL"
   fi
 
@@ -346,7 +364,7 @@ elif which apt-get >/dev/null; then
     exit 1
   fi
 
-  if [ -n "$VERBOSE" ]; then
+  if [ -z "$QUIET" ]; then
     echo "$EXE: dpkg installing $DEB_FILE"
   fi
 
@@ -359,7 +377,7 @@ elif which apt-get >/dev/null; then
 
   rm "$DEB_FILE"
 
-  if [ -n "$VERBOSE" ]; then
+  if [ -z "$QUIET" ]; then
     echo "$EXE: apt-get update"
   fi
 
@@ -370,7 +388,7 @@ elif which apt-get >/dev/null; then
     exit 1
   fi
 
-  if [ -n "$VERBOSE" ]; then
+  if [ -z "$QUIET" ]; then
     echo "$EXE: apt-get install cvmfs"
   fi
 
@@ -421,7 +439,7 @@ if [ -z "$STATIC" ]; then
   # Add public key for the config-repository
 
   CONFIG_REPO_KEY_FILE="$ORG_KEY_DIR/$CONFIG_REPO.pub"
-  if [ -n "$VERBOSE" ]; then
+  if [ -z "$QUIET" ]; then
     echo "$EXE: creating \"$CONFIG_REPO_KEY_FILE\""
   fi
 
@@ -431,7 +449,7 @@ if [ -z "$STATIC" ]; then
   # Create configuration for the config-repository
 
   FILE="/etc/cvmfs/config.d/$CONFIG_REPO.conf"
-  if [ -n "$VERBOSE" ]; then
+  if [ -z "$QUIET" ]; then
     echo "$EXE: creating \"$FILE\""
   fi
 
@@ -446,7 +464,7 @@ EOF
   # Configure CernVM-FS to use the configurations from config-repository
 
   FILE="/etc/cvmfs/default.d/80-$ORG-cvmfs.conf"
-  if [ -n "$VERBOSE" ]; then
+  if [ -z "$QUIET" ]; then
     echo "$EXE: creating \"$FILE\""
   fi
 
@@ -470,7 +488,7 @@ else
   # Add public key for the repository
 
   REPO_PUBKEY_FILE="$ORG_KEY_DIR/$DATA_REPO.pub"
-  if [ -n "$VERBOSE" ]; then
+  if [ -z "$QUIET" ]; then
     echo "$EXE: creating \"$REPO_PUBKEY_FILE\""
   fi
 
@@ -480,7 +498,7 @@ else
   # Create domain.d/org.conf
 
   FILE=/etc/cvmfs/domain.d/${ORG}.conf
-  if [ -n "$VERBOSE" ]; then
+  if [ -z "$QUIET" ]; then
     echo "$EXE: creating \"$FILE\""
   fi
 
@@ -505,7 +523,7 @@ fi
 
 FILE="/etc/cvmfs/default.local"
 
-if [ -n "$VERBOSE" ]; then
+if [ -z "$QUIET" ]; then
   echo "$EXE: creating \"$FILE\""
 fi
 
@@ -535,7 +553,7 @@ fi
 
 # Setup
 
-if [ -n "$VERBOSE" ]; then
+if [ -z "$QUIET" ]; then
   echo "$EXE: running \"cvmfs_config setup\""
 fi
 
@@ -547,7 +565,7 @@ fi
 #----------------------------------------------------------------
 # Success
 
-if [ -n "$VERBOSE" ]; then
+if [ -z "$QUIET" ]; then
   echo "$EXE: ok"
 fi
 

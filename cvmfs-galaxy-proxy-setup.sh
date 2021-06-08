@@ -21,7 +21,7 @@
 #================================================================
 
 PROGRAM='cvmfs-galaxy-proxy-setup'
-VERSION='1.0.1'
+VERSION='1.1.0'
 
 EXE=$(basename "$0" .sh)
 EXE_EXT=$(basename "$0")
@@ -71,6 +71,7 @@ CLIENTS=
 PROXY_PORT=$DEFAULT_PROXY_PORT
 DISK_CACHE_SIZE_MB=$DEFAULT_DISK_CACHE_SIZE_MB
 MEM_CACHE_SIZE_MB=$DEFAULT_MEM_CACHE_SIZE_MB
+QUIET=
 VERBOSE=
 SHOW_VERSION=
 SHOW_HELP=
@@ -90,6 +91,10 @@ do
     -m|--mem-cache)
       MEM_CACHE_SIZE_MB="$2"
       shift; shift
+      ;;
+    -q|--quiet)
+      QUIET=yes
+      shift # past argument
       ;;
     -v|--verbose)
       VERBOSE=yes
@@ -126,6 +131,9 @@ do
   esac
 done
 
+#----------------
+# Help and version options
+
 if [ -n "$SHOW_HELP" ]; then
   if ip addr | grep 203.101.239.255 >/dev/null ; then
     EXAMPLE_CLIENTS="203.101.224.0/20" # QRIScloud specific example
@@ -139,6 +147,7 @@ Options:
   -p | --port NUM       proxy port (default: $DEFAULT_PROXY_PORT)
   -d | --disk-cache NUM size of disk cache in MiB (default: $DEFAULT_DISK_CACHE_SIZE_MB)
   -m | --mem-cache NUM  size of memory cache in MiB (default: $DEFAULT_MEM_CACHE_SIZE_MB)
+  -q | --quiet          output nothing unless an error occurs
   -v | --verbose        output extra information when running
        --version        display version information and exit
   -h | --help           display this help and exit
@@ -152,6 +161,14 @@ fi
 if [ -n "$SHOW_VERSION" ]; then
   echo "$PROGRAM $VERSION"
   exit 0
+fi
+
+#----------------
+# Other options
+
+if [ -n "$VERBOSE" ] && [ -n "$QUIET" ]; then
+  # Verbose overrides quiet, if both are specified
+  QUIET=
 fi
 
 if ! echo "$PROXY_PORT" | grep -E '^[0-9]+$' >/dev/null ; then
@@ -241,7 +258,7 @@ _yum_install() {
   if ! rpm -q $PKG >/dev/null ; then
     # Not already installed
 
-    if [ -n "$VERBOSE" ]; then
+    if [ -z "$QUIET" ]; then
       echo "$EXE: yum install: $PKG"
     fi
 
@@ -251,10 +268,13 @@ _yum_install() {
       echo "$EXE: error: yum install: $PKG failed" >&2
       exit 1
     fi
+    if [ -n "$VERBOSE" ]; then
+      cat $LOG
+    fi
     rm $LOG
 
   else
-    if [ -n "$VERBOSE" ]; then
+    if [ -z "$QUIET" ]; then
       echo "$EXE: package already installed: $PKG"
     fi
   fi
@@ -270,7 +290,7 @@ if which yum >/dev/null; then
 elif which apt-get >/dev/null; then
   # Installing for Debian based systems
 
-  if [ -n "$VERBOSE" ]; then
+  if [ -z "$QUIET" ]; then
     echo "$EXE: apt-get update"
   fi
 
@@ -283,7 +303,7 @@ elif which apt-get >/dev/null; then
 
   # Install Squid proxy server
 
-  if [ -n "$VERBOSE" ]; then
+  if [ -z "$QUIET" ]; then
     echo "$EXE: apt-get install: squid"
   fi
 
@@ -305,7 +325,7 @@ fi
 
 SQUID_CONF='/etc/squid/squid.conf'
 
-if [ -n "$VERBOSE" ]; then
+if [ -z "$QUIET" ]; then
   echo "$EXE: creating \"$SQUID_CONF\""
 fi
 
@@ -374,7 +394,7 @@ fi
 #----------------------------------------------------------------
 # Start Squid and enable it to start when the host boots
 
-if [ -n "$VERBOSE" ]; then
+if [ -z "$QUIET" ]; then
   echo "$EXE: restarting and enabling squid.service"
 fi
 
@@ -392,7 +412,7 @@ fi
 #----------------------------------------------------------------
 # Success
 
-if [ -n "$VERBOSE" ]; then
+if [ -z "$QUIET" ]; then
   echo "$EXE: ok"
 fi
 

@@ -53,14 +53,21 @@ Both scripts support these options.
 
 The `--help` option shows the usage information and  available options.
 
+#### Quiet
+
+The script normally outputs brief information indicating what it is
+doing. That output can be suppressed with the `--quiet` option.
+
+If the `--quiet` option is used, no output is produced unless an error
+occurs. Note: the scripts can take a minute or two to run.
+
 #### Verbose
 
-The `--verbose` option causes the setup process to print out what it
-is doing.
+The `--verbose` option causes the setup process to output extra
+information while it is running.
 
-Without the verbose option, the scripts will not produce any output,
-unless something went wrong. The scripts can take a minute or two to
-run.
+If both `--verbose` and `--quiet` are specified, the quiet option is
+ignored.
 
 ### Supported distributions
 
