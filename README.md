@@ -76,12 +76,15 @@ package managers to install the CVMFS software.
 
 The scripts has been tested on:
 
-- CentOS 7
+- CentOS 7.2 and later
 - CentOS 8
 - CentOS Stream 8
 - Ubuntu 20.04
 - Ubuntu 18.04
 - Ubuntu 16.04
+
+Note: the scripts do not work on CentOS 7.1 and earlier, since the TLS
+and/or certificates in them are out of date.
 
 ## Proxy
 

@@ -66,6 +66,7 @@ set -e
 
 #----------------------------------------------------------------
 # Command line arguments
+# Note: parsing does not support combining single letter options (e.g. "-vh")
 
 CLIENTS=
 PROXY_PORT=$DEFAULT_PROXY_PORT
@@ -80,53 +81,64 @@ while [ $# -gt 0 ]
 do
   case "$1" in
     -p|--port)
+      if [ $# -lt 2 ]; then
+        echo "$EXE: usage error: $1 missing value" >&2
+        exit 2
+      fi
       PROXY_PORT="$2"
-      shift
-      shift
+      shift; shift
       ;;
     -d|--disk-cache)
+      if [ $# -lt 2 ]; then
+        echo "$EXE: usage error: $1 missing value" >&2
+        exit 2
+      fi
       DISK_CACHE_SIZE_MB="$2"
       shift; shift
       ;;
     -m|--mem-cache)
+      if [ $# -lt 2 ]; then
+        echo "$EXE: usage error: $1 missing value" >&2
+        exit 2
+      fi
       MEM_CACHE_SIZE_MB="$2"
       shift; shift
       ;;
     -q|--quiet)
       QUIET=yes
-      shift # past argument
+      shift
       ;;
     -v|--verbose)
       VERBOSE=yes
-      shift # past argument
+      shift
       ;;
     --version)
       SHOW_VERSION=yes
-      shift # past argument
+      shift
       ;;
     -h|--help)
       SHOW_HELP=yes
-      shift # past argument
+      shift
       ;;
-    *)    # unknown option
-      if echo "$1" | grep ^- >/dev/null; then
-        echo "$EXE: usage error: unknown option: \"$1\"" >&2
+    -*)
+      echo "$EXE: usage error: unknown option: $1" >&2
+      exit 2
+      ;;
+    *)
+      # Argument: client address
+
+      if echo "$1" | grep '^http://' >/dev/null; then
+        echo "$EXE: usage error: expecting an address, not a URL: \"$1\"" >&2
         exit 2
-      else
-        # Use as a client address
-
-        if echo "$1" | grep '^http://' >/dev/null; then
-          echo "$EXE: usage error: expecting an address, not a URL: \"$1\"" >&2
-          exit 2
-        fi
-        if echo "$1" | grep '^https://' >/dev/null; then
-          echo "$EXE: usage error: expecting an address, not a URL: \"$1\"" >&2
-          exit 2
-        fi
-
-        CLIENTS="$CLIENTS $1"
       fi
-      shift # past argument
+      if echo "$1" | grep '^https://' >/dev/null; then
+        echo "$EXE: usage error: expecting an address, not a URL: \"$1\"" >&2
+        exit 2
+      fi
+
+      CLIENTS="$CLIENTS $1"
+
+      shift
       ;;
   esac
 done
@@ -135,7 +147,7 @@ done
 # Help and version options
 
 if [ -n "$SHOW_HELP" ]; then
-  if ip addr | grep 203.101.239.255 >/dev/null ; then
+  if ip addr | grep 203.101.239.255 >/dev/null 2>&1  ; then
     EXAMPLE_CLIENTS="203.101.224.0/20" # QRIScloud specific example
   else
     EXAMPLE_CLIENTS="192.168.0.0/16 172.16.0.0/12"

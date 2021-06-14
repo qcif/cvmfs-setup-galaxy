@@ -102,6 +102,7 @@ set -e
 
 #----------------------------------------------------------------
 # Command line arguments
+# Note: parsing does not support combining single letter options (e.g. "-vh")
 
 CVMFS_HTTP_PROXY=
 STATIC=
@@ -120,70 +121,72 @@ do
         exit 2
       fi
       CVMFS_HTTP_PROXY=DIRECT
-      shift # past argument
+      shift
       ;;
     -s|--static-config)
       STATIC=yes
-      shift;
+      shift
       ;;
     -c|--cache-size)
+      if [ $# -lt 2 ]; then
+        echo "$EXE: usage error: $1 missing value" >&2
+        exit 2
+      fi
       CVMFS_QUOTA_LIMIT_MB="$2"
-      shift # past argument
-      shift # past value
+      shift; shift
       ;;
     -q|--quiet)
       QUIET=yes
-      shift # past argument
+      shift
       ;;
     -v|--verbose)
       VERBOSE=yes
-      shift # past argument
+      shift
       ;;
     --version)
       SHOW_VERSION=yes
-      shift # past argument
+      shift
       ;;
     -h|--help)
       SHOW_HELP=yes
-      shift # past argument
+      shift
+      ;;
+    -*)
+      echo "$EXE: usage error: unknown option: $1" >&2
+      exit 2
       ;;
     *)
-      # unknown option
-      if echo "$1" | grep ^- >/dev/null; then
-        echo "$EXE: usage error: unknown option: \"$1\"" >&2
+      # Argument
+
+      if [ "$CVMFS_HTTP_PROXY" = 'DIRECT' ]; then
+        echo "$EXE: usage error: do not provide proxies with --direct" >&2
         exit 2
-      else
-        # Use as a proxy address
-
-        if [ "$CVMFS_HTTP_PROXY" = 'DIRECT' ]; then
-          echo "$EXE: usage error: do not provide proxies with --direct" >&2
-          exit 2
-        fi
-
-        if echo "$1" | grep '^http://' >/dev/null; then
-          echo "$EXE: usage error: expecting an address, not a URL: \"$1\"" >&2
-          exit 2
-        fi
-        if echo "$1" | grep '^https://' >/dev/null; then
-          echo "$EXE: usage error: expecting an address, not a URL: \"$1\"" >&2
-          exit 2
-        fi
-
-        if echo "$1" | grep ':' >/dev/null; then
-          # Value has a port number
-          P="$1"
-        else
-          # Use default port number
-          P="$1:$DEFAULT_PROXY_PORT"
-        fi
-
-        if [ -z "$CVMFS_HTTP_PROXY" ]; then
-          CVMFS_HTTP_PROXY="$P"
-        else
-          CVMFS_HTTP_PROXY="$CVMFS_HTTP_PROXY;$P"
-        fi
       fi
-      shift # past argument
+
+      if echo "$1" | grep '^http://' >/dev/null; then
+        echo "$EXE: usage error: expecting an address, not a URL: \"$1\"" >&2
+        exit 2
+      fi
+      if echo "$1" | grep '^https://' >/dev/null; then
+        echo "$EXE: usage error: expecting an address, not a URL: \"$1\"" >&2
+        exit 2
+      fi
+
+      if echo "$1" | grep ':' >/dev/null; then
+        # Value has a port number
+        P="$1"
+      else
+        # Use default port number
+        P="$1:$DEFAULT_PROXY_PORT"
+      fi
+
+      if [ -z "$CVMFS_HTTP_PROXY" ]; then
+        CVMFS_HTTP_PROXY="$P"
+      else
+        CVMFS_HTTP_PROXY="$CVMFS_HTTP_PROXY;$P"
+      fi
+
+      shift
       ;;
   esac
 done
@@ -223,7 +226,7 @@ if [ -n "$VERBOSE" ] && [ -n "$QUIET" ]; then
 fi
 
 if ! echo "$CVMFS_QUOTA_LIMIT_MB" | grep -E '^[0-9]+$' >/dev/null ; then
-  echo "$EXE: usage error: invalid number: \"$CVMFS_QUOTA_LIMIT_MB\"" >&2
+  echo "$EXE: usage error: invalid cache size: \"$CVMFS_QUOTA_LIMIT_MB\"" >&2
   exit 2
 fi
 if [ "$CVMFS_QUOTA_LIMIT_MB" -lt $MIN_CACHE_SIZE_MB ]; then
