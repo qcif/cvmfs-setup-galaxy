@@ -43,7 +43,7 @@ The two scripts are for deploying _proxies_ and _clients_.
 1. Download either the proxy or client setup script.
 2. Run the script.
 3. For proxies, clients can be created to use it.
-   For clients, start using the files from the CVMFS repositories.
+   For clients, start using the files from the CernVM-FS repositories.
 
 ### Common options
 
@@ -72,7 +72,7 @@ ignored.
 ### Supported distributions
 
 The scripts only work on Linux, since they use the _yum_ or _apt-get_
-package managers to install the CVMFS software.
+package managers to install the CernVM-FS software.
 
 The scripts has been tested on:
 
@@ -144,7 +144,10 @@ The script will:
 - install the CernVM-FS client software
 - create configuration files for the Galaxy Project CernVM-FS repositories
 
-The repositories can then be accessed in the normal manner:
+The repositories can then be accessed in the normal manner, as autofs
+mounts under the "/cvmfs" directory. The name of the mount is the
+repository name, which (by convention) looks like a domain name
+(e.g. "data.galaxyproject.org").
 
 ```sh
 $ ls /cvmfs/data.galaxyproject.org
@@ -202,6 +205,7 @@ by NCRIS via Bioplatforms Australia funding.
 
 ## See also
 
-- [usegalaxy.org Reference data](https://galaxyproject.org/admin/reference-data-repo/) - documentation on the Galaxy Project's CVMFS repositories
+- [usegalaxy.org Reference data](https://galaxyproject.org/admin/reference-data-repo/) -
+  documentation on the Galaxy Project's CernVM-FS repositories
 
 - [CVMFS documentation](https://cvmfs.readthedocs.io/en/stable/)
