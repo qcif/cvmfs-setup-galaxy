@@ -238,6 +238,10 @@ elif echo "$DISTRO" | grep '^CentOS Linux release 8' > /dev/null; then
   :
 elif echo "$DISTRO" | grep '^CentOS Stream release 8' > /dev/null; then
   :
+elif [ "$DISTRO" = 'Ubuntu 21.04' ]; then
+  :
+elif [ "$DISTRO" = 'Ubuntu 20.10' ]; then
+  :
 elif [ "$DISTRO" = 'Ubuntu 20.04' ]; then
   :
 elif [ "$DISTRO" = 'Ubuntu 18.04' ]; then
