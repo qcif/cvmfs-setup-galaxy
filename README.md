@@ -1,4 +1,4 @@
-# CernVM-FS setup for Galaxy Project CVMFS repositories
+# CernVM-FS setup scripts for Galaxy Project repositories
 
 Scripts for setting up CernVM-FS clients and caching proxy
 servers to use the _Galaxy Project_ CernVM-FS repositories. The
@@ -210,4 +210,4 @@ by NCRIS via Bioplatforms Australia funding.
 - [usegalaxy.org Reference data](https://galaxyproject.org/admin/reference-data-repo/) -
   documentation on the Galaxy Project's CernVM-FS repositories
 
-- [CVMFS documentation](https://cvmfs.readthedocs.io/en/stable/)
+- [CernVM-FS documentation](https://cvmfs.readthedocs.io/)
