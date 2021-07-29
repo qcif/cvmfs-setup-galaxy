@@ -149,10 +149,10 @@ done
 # Help and version options
 
 if [ -n "$SHOW_HELP" ]; then
-  EXAMPLE_CLIENTS="192.168.0.0/16 172.16.0.0/12" # generic example
+  EXAMPLE_CLIENTS="192.168.0.0/16 172.16.0.0/12  # examples only: use your client addresses"
   if which ip >/dev/null 2>&1; then
     if ip addr | grep -q 203.101.239.255; then
-      EXAMPLE_CLIENTS="203.101.224.0/20 # QRIScloud only" # QRIScloud example
+      EXAMPLE_CLIENTS="203.101.224.0/20 # only allow clients in QRIScloud"
     fi
   fi
 

@@ -98,9 +98,8 @@ $ sudo ./cvmfs-galaxy-proxy-setup.sh CLIENT_HOSTS
 
 The _client hosts_ indicate which hosts can connect to the proxy. It
 must include all the machines that will be clients, otherwise they
-won't be able to use the proxy. Provide one or more CIDR values
-(e.g. "192.168.0.0/16 172.16.0.0/12") or individual IP addresses or
-hostnames.
+won't be able to use the proxy. Provide one or more CIDR values,
+individual IP addresses or hostnames.
 
 The script will:
 

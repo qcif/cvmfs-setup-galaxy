@@ -209,7 +209,7 @@ Options:
   -h | --help            display this help and exit
 proxies:
   IP address of proxy servers with optional port (default: $DEFAULT_PROXY_PORT)
-  e.g. 192.168.1.200 192.168.1.201:8080
+  e.g. 192.168.1.200 192.168.1.201:8080  # examples only: use your local proxy
 EOF
   exit 0
 fi
