@@ -98,6 +98,8 @@ owIDAQAB
 
 ZONEINFO=/usr/share/zoneinfo
 
+DEFAULT_TIMEZONE=Etc/UTC
+
 #----------------------------------------------------------------
 # Error handling
 
@@ -516,28 +518,89 @@ _apt_get_install() {
 # Shared functions
 
 _set_timezone() {
-  local EXTRA="$1"
+  local EXTRA=
+  if [ $# -gt 0 ]; then
+    EXTRA="$1"
+  fi
 
-  # Set the timezone. This is needed when running inside Docker.
+  # If the timezone is configured, this code will ALWAYS create the
+  # /etc/localtime symbolic link, but will NOT CREATE the
+  # /etc/timezone file if it does not exist (ONLY UPDATING it to match
+  # the symbolic link, if the file already exists). Some systems have
+  # both (e.g. Ubuntu 20.04) and some systems only have the symbolic
+  # link (e.g. CentOS 7).
+
+  if [ -z "$TIMEZONE" ]; then
+    # User has not asked for the timezone to be configured...
+    # ... but if it is not configured, try to configure it to an inferred
+    # value or DEFAULT_TIMEZONE.
+
+    # Determine if the timezone symlink needs to be created, and what
+    # value to set it to.
+
+    if [ ! -e /etc/localtime ]; then
+      # Symlink missing: need to create it
+
+      if [ ! -f /etc/timezone ]; then
+        # File does not exist
+        TIMEZONE=$DEFAULT_TIMEZONE
+      else
+        # File exists: use the value from in it
+        TIMEZONE=$(cat /etc/timezone)
+      fi
+    fi
+
+    if [ -n "$TIMEZONE" ]; then
+      # TIMEZONE is to be configured, because the symlink is missing.
+
+      # Check if the extracted timezone value is usable, since there
+      # might have been an invalid value in the /etc/timezone file If
+      # the value is not usable, the TIMEZONE is returned to being the
+      # empty string: it is not an error, because the user never asked
+      # for the timezone to be changeed.
+
+      if [ -d "$ZONEINFO" ]; then
+        if [ ! -e "$ZONEINFO/$TIMEZONE" ]; then # Note: file or symlink
+          # Bad value: do not configure the timezone
+          TIMEZONE=
+        fi
+
+      else
+        # No zoneinfo directory: do not configure the timezone
+        TIMEZONE=
+      fi
+    fi
+
+    # Note: if the user had explicitly requested the timezone to be set,
+    # the value has already been checked when the command line arguments
+    # were processed.
+  fi
+
+  # Configure the timezone _only_ if TIMEZONE is set (i.e. the user explicitly
+  # asked for it, or it has not been already configured).
 
   if [ -n "$TIMEZONE" ]; then
     # Configure timezone
 
-    # /etc/localtime symlink
+    # /etc/localtime symlink (mandatory)
 
     if [ -z "$QUIET" ]; then
       echo "$EXE: timezone: $TIMEZONE: /etc/localtime"
     fi
     ln -s -f "$ZONEINFO/$TIMEZONE" /etc/localtime
 
-    # /etc/timezone file
+    # /etc/timezone file (optional)
 
-    if [ -z "$QUIET" ]; then
-      echo "$EXE: timezone: $TIMEZONE: /etc/timezone"
+    if [ -f /etc/timezone ]; then
+      # Update the file, since it already exists (i.e. never create it)
+
+      if [ -z "$QUIET" ]; then
+        echo "$EXE: timezone: $TIMEZONE: /etc/timezone"
+      fi
+      echo "$TIMEZONE" > /etc/timezone
     fi
-    echo "$TIMEZONE" > /etc/timezone
 
-    # Extra configurations for special situations
+    # Extra configurations (only if requested)
 
     if [ "$EXTRA" = DEBIAN_FRONTEND ]; then
       # Additions for Debian (needed when scrit is run inside Docker)
