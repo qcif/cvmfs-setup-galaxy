@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.0
+
+- Disable use of Geo API by default and added --geo-api option to enable it.
+- Added optional timezone configuration (needed for Docker).
+- Added packages needed when script is run inside Docker with Debian/Ubuntu.
+
 ## 1.1.1
 
 - Updated code for consistency with cvmfs-setup-example scripts.

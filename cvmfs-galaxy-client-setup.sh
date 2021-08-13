@@ -25,7 +25,7 @@
 #================================================================
 
 PROGRAM='cvmfs-galaxy-client-setup'
-VERSION='1.1.1'
+VERSION='1.2.0'
 
 EXE=$(basename "$0" .sh)
 EXE_EXT=$(basename "$0")
@@ -53,11 +53,12 @@ PROGRAM_INFO="Created by $PROGRAM $VERSION [$(date '+%F %T %Z')]"
 ORG=galaxyproject.org
 
 STRATUM_1_HOSTS="
-  cvmfs1-psu0.galaxyproject.org \
-  cvmfs1-iu0.galaxyproject.org \
-  cvmfs1-tacc0.galaxyproject.org \
+  cvmfs1-mel0.gvl.org.au \
   cvmfs1-ufr0.galaxyproject.eu \
-  cvmfs1-mel0.gvl.org.au"
+  cvmfs1-tacc0.galaxyproject.org \
+  cvmfs1-iu0.galaxyproject.org \
+  cvmfs1-psu0.galaxyproject.org"
+# Above order is significant, especially when not using the Geo API
 
 # For dynamic configuration: the config repository
 
@@ -93,6 +94,10 @@ owIDAQAB
 -----END PUBLIC KEY-----
 '
 
+# Timezone database
+
+ZONEINFO=/usr/share/zoneinfo
+
 #----------------------------------------------------------------
 # Error handling
 
@@ -109,6 +114,8 @@ set -u # fail on attempts to expand undefined environment variables
 CVMFS_HTTP_PROXY=
 STATIC=
 CVMFS_QUOTA_LIMIT_MB=$DEFAULT_CACHE_SIZE_MB
+USE_GEO_API=
+TIMEZONE=
 QUIET=
 VERBOSE=
 SHOW_VERSION=
@@ -135,6 +142,18 @@ do
         exit 2
       fi
       CVMFS_QUOTA_LIMIT_MB="$2"
+      shift; shift
+      ;;
+    -g|--geo-api)
+      USE_GEO_API=yes
+      shift
+      ;;
+    -t|--timezone|--tz)
+      if [ $# -lt 2 ]; then
+        echo "$EXE: usage error: $1 missing value" >&2
+        exit 2
+      fi
+      TIMEZONE="$2"
       shift; shift
       ;;
     -q|--quiet)
@@ -201,8 +220,13 @@ if [ -n "$SHOW_HELP" ]; then
 Usage: $EXE_EXT [options] {proxies}
 Options:
   -c | --cache-size NUM  size of cache in MiB (default: $DEFAULT_CACHE_SIZE_MB)
+  -g | --geo-api         enable use of the Geo API (default: do not use it)
+
   -s | --static-config   configure $DATA_REPO only (not recommended)
   -d | --direct          no proxies, connect to Stratum 1 (not recommended)
+
+  -t | --timezone TZ     set the timezone (e.g. Etc/UTC or Australia/Brisbane)
+
   -q | --quiet           output nothing unless an error occurs
   -v | --verbose         output extra information when running
        --version         display version information and exit
@@ -221,6 +245,20 @@ fi
 
 #----------------
 # Other options
+
+if [ -n "$TIMEZONE" ]; then
+  # Timezone configuration requested: check value is a valid timezone name
+
+  if [ ! -d "$ZONEINFO" ]; then
+    echo "$EXE: cannot set timezone: directory not found: $ZONEINFO" >&2
+    exit 3
+  fi
+
+  if [ ! -e "$ZONEINFO/$TIMEZONE" ]; then # Note: could be file or symlink
+    echo "$EXE: cannot set timezone: unknown timezone: $TIMEZONE" >&2
+    exit 1
+  fi
+fi
 
 if [ -n "$VERBOSE" ] && [ -n "$QUIET" ]; then
   # Verbose overrides quiet, if both are specified
@@ -475,6 +513,42 @@ _apt_get_install() {
 }
 
 #----------------
+# Shared functions
+
+_set_timezone() {
+  local EXTRA="$1"
+
+  # Set the timezone. This is needed when running inside Docker.
+
+  if [ -n "$TIMEZONE" ]; then
+    # Configure timezone
+
+    # /etc/localtime symlink
+
+    if [ -z "$QUIET" ]; then
+      echo "$EXE: timezone: $TIMEZONE: /etc/localtime"
+    fi
+    ln -s -f "$ZONEINFO/$TIMEZONE" /etc/localtime
+
+    # /etc/timezone file
+
+    if [ -z "$QUIET" ]; then
+      echo "$EXE: timezone: $TIMEZONE: /etc/timezone"
+    fi
+    echo "$TIMEZONE" > /etc/timezone
+
+    # Extra configurations for special situations
+
+    if [ "$EXTRA" = DEBIAN_FRONTEND ]; then
+      # Additions for Debian (needed when scrit is run inside Docker)
+      DEBIAN_FRONTEND="noninteractive apt-get install -y --no-install-recommends tzdata"
+      # echo "$EXE: DEBIAN_FRONTEND=$DEBIAN_FRONTEND"
+    fi
+
+  fi
+}
+
+#----------------
 # Install for either Fedora or Debian based distributions
 
 YUM=yum
@@ -485,12 +559,17 @@ fi
 if which $YUM >/dev/null 2>&1; then
   # Installing for Fedora based distributions
 
+  _set_timezone
+
   if _yum_not_installed 'cvmfs'; then
 
+    # TODO: additional packages needed when inside a Docker environment
+
+    # Get the CernVM-FS repo
     _yum_install_repo 'cernvm' \
       https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest.noarch.rpm
 
-    _yum_install cvmfs
+    _yum_install cvmfs # install CernVM-FS
 
   else
     if [ -z "$QUIET" ]; then
@@ -501,14 +580,26 @@ if which $YUM >/dev/null 2>&1; then
 elif which apt-get >/dev/null 2>&1; then
   # Installing for Debian based distributions
 
+  _set_timezone DEBIAN_FRONTEND
+
   if _dpkg_not_installed 'cvmfs' ; then
 
+    _apt_get_update # first update
+
+    # These are needed when inside a Docker environment
+    _apt_get_install apt-utils
+    _apt_get_install python3
+    _apt_get_install wget
+    _apt_get_install distro-info-data
+    _apt_get_install lsb-release
+
+    # Get the CernVM-FS repo
     _dpkg_download_and_install 'cvmfs-release' \
       https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest_all.deb
 
-    _apt_get_update
+    _apt_get_update # second update MUST be done after cvmfs-release-latest_all
 
-    _apt_get_install cvmfs
+    _apt_get_install cvmfs # install CernVM-FS
 
   else
     if [ -z "$QUIET" ]; then
@@ -643,12 +734,23 @@ if [ -z "$QUIET" ]; then
   echo "$EXE: creating \"$FILE\""
 fi
 
+if [ -z "$USE_GEO_API" ]; then
+  # This is the default, because we've found that the geographic
+  # ordering is not always correct. Good or bad results are obtained,
+  # depending on which Stratum 1 is queried and the particular
+  # client/proxy IP address.
+
+  GC='# '  # Comment out CVMFS_USE_GEOAPI ("no" works, but is not documented)
+else
+  GC=''  # Do not comment it out: i.e. set CVMFS_USE_GEOAPI to "yes"
+fi
+
 cat > "$FILE" <<EOF
 # $PROGRAM_INFO
 
 CVMFS_HTTP_PROXY=${CVMFS_HTTP_PROXY}
 CVMFS_QUOTA_LIMIT=${CVMFS_QUOTA_LIMIT_MB}  # cache size in MiB (recommended: 4GB to 50GB)
-CVMFS_USE_GEOAPI=yes  # sort server list by geographic distance from client
+${GC}CVMFS_USE_GEOAPI=yes
 EOF
 
 if [ -n "$STATIC" ]; then
