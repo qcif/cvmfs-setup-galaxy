@@ -77,8 +77,8 @@ package managers to install the CernVM-FS software.
 The scripts has been tested on:
 
 - CentOS 7.2 and later
-- CentOS 8
 - CentOS Stream 8
+- Rocky Linux 8
 - Ubuntu 21.04
 - Ubuntu 20.10
 - Ubuntu 20.04

@@ -21,11 +21,11 @@
 # configurations from the "cvmfs-config.galaxyproject.org" repository
 # for the Galaxy repositories.
 #
-# Copyright (C) 2021, QCIF Ltd.
+# Copyright (C) 2021, 2022, QCIF Ltd.
 #================================================================
 
 PROGRAM='cvmfs-galaxy-client-setup'
-VERSION='1.2.0'
+VERSION='1.3.0'
 
 EXE=$(basename "$0" .sh)
 EXE_EXT=$(basename "$0")
@@ -305,6 +305,8 @@ if echo "$DISTRO" | grep -q '^CentOS Linux release 7'; then
 elif echo "$DISTRO" | grep -q '^CentOS Linux release 8'; then
   :
 elif echo "$DISTRO" | grep -q '^CentOS Stream release 8'; then
+  :
+elif echo "$DISTRO" | grep -q '^Rocky Linux release 8\.'; then
   :
 elif [ "$DISTRO" = 'Ubuntu 21.04' ]; then
   :

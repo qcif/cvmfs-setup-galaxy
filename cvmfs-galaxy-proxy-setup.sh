@@ -17,11 +17,11 @@
 # Install a Squid Proxy server for accessing the Galaxy CernVM-FS
 # repositories.
 #
-# Copyright (C) 2021, QCIF Ltd.
+# Copyright (C) 2021, 2022, QCIF Ltd.
 #================================================================
 
 PROGRAM='cvmfs-galaxy-proxy-setup'
-VERSION='1.1.1'
+VERSION='1.2.0'
 
 EXE=$(basename "$0" .sh)
 EXE_EXT=$(basename "$0")
@@ -239,6 +239,8 @@ if echo "$DISTRO" | grep -q '^CentOS Linux release 7'; then
 elif echo "$DISTRO" | grep -q '^CentOS Linux release 8'; then
   :
 elif echo "$DISTRO" | grep -q '^CentOS Stream release 8'; then
+  :
+elif echo "$DISTRO" | grep -q '^Rocky Linux release 8\.'; then
   :
 elif [ "$DISTRO" = 'Ubuntu 21.04' ]; then
   :

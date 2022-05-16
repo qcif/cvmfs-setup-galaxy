@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.0
+
+- Added support for Rocky Linux 8.x.
+
 ## 1.2.0
 
 - Disable use of Geo API by default and added --geo-api option to enable it.
