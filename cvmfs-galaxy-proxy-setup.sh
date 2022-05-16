@@ -500,6 +500,8 @@ http_port ${PROXY_PORT}
 #----------------
 # Access control
 
+# DEFINITIONS
+
 # Addresses (CIDR) allowed to use this proxy (i.e. the client hosts)
 EOF
 
@@ -509,7 +511,7 @@ done
 
 cat >> "$SQUID_CONF" <<EOF
 
-# Destinations the proxy is allowed to access (i.e. the Stratum 1 replicas)
+# Destinations this proxy is allowed to access (i.e. the Stratum 1 replicas)
 #   Can be "dst IP_ADDR", "dstdomain .EXAMPLE.ORG" or "dstdom_regex REGEX"
 EOF
 
@@ -519,14 +521,16 @@ done
 
 cat >> "$SQUID_CONF" <<EOF
 
-# Deny access to all except the stratum_ones ACL.
+# RULES
+
+# Deny access to all destinations except the known "stratum_ones".
 http_access deny !stratum_ones
 
-# Allow from local client hosts and localhost
+# Allow access from sources in the known "client_nodes" and localhost.
 http_access allow client_nodes
 http_access allow localhost
 
-# Finally, deny all others
+# Finally, deny all other source and destination access.
 http_access deny all
 
 #----------------
@@ -543,6 +547,7 @@ maximum_object_size_in_memory 16 MB
 # cache_dir TYPE DIRECTORY-NAME FS-SPECIFIC-DATA [OPTIONS]
 # cache_dir ufs  DIRECTORY-NAME Mbytes L1 L2     [OPTIONS]
 cache_dir ufs /var/spool/squid ${DISK_CACHE_SIZE_MB} 16 256
+
 EOF
 
 #----------------------------------------------------------------

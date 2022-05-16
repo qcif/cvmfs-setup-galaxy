@@ -152,10 +152,13 @@ repository name, which (by convention) looks like a domain name
 
 ```sh
 $ ls /cvmfs/data.galaxyproject.org
-$ cvmfs_config stat -v
-
 $ ls /cvmfs/main.galaxyproject.org
 $ ls /cvmfs/singularity.galaxyproject.org
+
+$ sudo cvmfs_config chksetup
+$ cvmfs_config status
+$ cvmfs_config stat -v
+$ cvmfs_config stat -v data.galaxyproject.org
 ```
 
 Note: as with all _autofs_ mounts, they won't appear under _/cvmfs_
