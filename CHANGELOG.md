@@ -1,8 +1,13 @@
 # Changelog
 
+## 1.4.0
+
+- Added support for Rocky Linux 8.6.
+- Added support for Rocky Linux 9.0.
+
 ## 1.3.0
 
-- Added support for Rocky Linux 8.x.
+- Added support for Rocky Linux 8.5.
 
 ## 1.2.0
 
