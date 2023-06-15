@@ -21,11 +21,11 @@
 # configurations from the "cvmfs-config.galaxyproject.org" repository
 # for the Galaxy repositories.
 #
-# Copyright (C) 2021, 2022, QCIF Ltd.
+# Copyright (C) 2021, 2022, 2023, QCIF Ltd.
 #================================================================
 
 PROGRAM='cvmfs-galaxy-client-setup'
-VERSION='1.4.0'
+VERSION='1.4.1'
 
 EXE=$(basename "$0" .sh)
 EXE_EXT=$(basename "$0")
@@ -122,6 +122,10 @@ QUIET=
 VERBOSE=
 SHOW_VERSION=
 SHOW_HELP=
+
+if [ $# -eq 0 ]; then
+  SHOW_HELP=yes
+fi
 
 while [ $# -gt 0 ]
 do
@@ -236,6 +240,7 @@ Options:
 proxies:
   IP address of proxy servers with optional port (default: $DEFAULT_PROXY_PORT)
   e.g. 192.168.1.200 192.168.1.201:8080  # examples only: use your local proxy
+
 EOF
   exit 0
 fi
@@ -304,9 +309,11 @@ case "$DISTRO" in
   'CentOS Linux release 7.'* \
     | 'CentOS Linux release 8.'* \
     | 'CentOS Stream release 8' \
+    | 'Rocky Linux release 8.8 (Green Obsidian)' \
     | 'Rocky Linux release 8.5 (Green Obsidian)' \
     | 'Rocky Linux release 8.6 (Green Obsidian)' \
     | 'Rocky Linux release 9.0 (Blue Onyx)' \
+    | 'Rocky Linux release 9.2 (Blue Onyx)' \
     | 'Ubuntu 21.04' \
     | 'Ubuntu 20.04' \
     | 'Ubuntu 20.10' )
